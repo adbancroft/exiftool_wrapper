@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\Wrapper\exifTool_wrapper.csproj"/>
+    <ProjectReference Include="..\ExiftoolUtils\exifTool_utils.csproj"/>
   </ItemGroup>
 
   <PropertyGroup>

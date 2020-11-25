@@ -5,10 +5,10 @@ using System.Threading;
 using System.Linq;
 using System.Collections.ObjectModel;
 
-namespace ExifTool
+namespace ExifToolUtils
 {
     /// <summary>
-    /// Returned from <see cref="Wrapper.Execute(IEnumerable{string})"/>
+    /// Returned from <see cref="StayOpenWrapper.Execute(IEnumerable{string})"/>
     /// </summary>
     public sealed class ExecuteResult
     {
@@ -39,7 +39,7 @@ namespace ExifTool
     /// Takes care of the details of IPC via stdin and stdout without blocking
     /// or causing the child process stream buffers to fill.
     /// </remarks>
-    public class Wrapper : IDisposable
+    public class StayOpenWrapper : IDisposable
     {
         private readonly Process _exiftoolproc;
         private bool disposedValue;
@@ -49,7 +49,7 @@ namespace ExifTool
         /// Create a new wrapper
         /// </summary>
         /// <param name="exifToolExePath">Full path to exiftool executable</param>
-        public Wrapper(String exifToolExePath)
+        public StayOpenWrapper(String exifToolExePath)
         {
             _exiftoolproc = StartExifTool(exifToolExePath);
         }
