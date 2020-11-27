@@ -2,34 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
-using System.Linq;
-using System.Collections.ObjectModel;
 using System.Text;
 
 namespace ExifToolUtils
 {
-    /// <summary>
-    /// Returned from <see cref="StayOpenWrapper.Execute(IEnumerable{string})"/>
-    /// </summary>
-    public sealed class ExecuteResult
-    {
-        internal ExecuteResult(string stdOut, string stdErr)
-        {
-            StdOut = stdOut;
-            StdErr = stdErr;
-        }
-
-        /// <summary>
-        /// The text captured from exiftool stdout stream
-        /// </summary>
-        public string StdOut { get; }
-
-        /// <summary>
-        /// The text captured from exiftool stderr stream
-        /// </summary>
-        public string StdErr { get; }
-    }
-
     /// <summary>
     /// A wrapper for exiftool.exe to encapsulate the 'stay_open' behavior
     /// See:
@@ -64,7 +40,7 @@ namespace ExifToolUtils
         /// E.g. "-xmp", "-b", "image.jpg"
         /// </param>
         /// <returns>The output from exiftool stdout stream</returns>
-        public ExecuteResult Execute(IEnumerable<String> parameters)
+        public (string StdOut, string StdErr) Execute(IEnumerable<String> parameters)
         {
             if (disposedValue) throw new ObjectDisposedException(GetType().FullName);
 
@@ -79,8 +55,8 @@ namespace ExifToolUtils
 
                 using (var execComplete = new AutoResetEvent(false))
                 {
-                    var stdOutLines = new StringBuilder();
-                    var stdErrLines = new StringBuilder();
+                    var stdOut = new StringBuilder();
+                    var stdErr = new StringBuilder();
 
                     (bool foundMarker, string cleaned) TryRemoveEndOfOutputMarker(string input)
                     {
@@ -97,7 +73,7 @@ namespace ExifToolUtils
                         var (detectedMarker, clean) = TryRemoveEndOfOutputMarker(args.Data);
                         if (!String.IsNullOrEmpty(clean))
                         {
-                            stdOutLines.Append(clean);
+                            stdOut.Append(clean);
                         }
                         if (detectedMarker)
                         {
@@ -107,7 +83,7 @@ namespace ExifToolUtils
 
                     void StdErrAction(object sender, DataReceivedEventArgs args)
                     {
-                        stdErrLines.Append(args.Data);
+                        stdErr.Append(args.Data);
                     }
 
                     _exiftoolproc.OutputDataReceived += StdOutAction;
@@ -120,7 +96,7 @@ namespace ExifToolUtils
                     _exiftoolproc.OutputDataReceived -= StdOutAction;
                     _exiftoolproc.ErrorDataReceived -= StdErrAction;
 
-                    return new ExecuteResult(stdOutLines.ToString(), stdErrLines.ToString());
+                    return (StdOut: stdOut.ToString(), StdErr: stdErr.ToString());
                 }
             }
         }
