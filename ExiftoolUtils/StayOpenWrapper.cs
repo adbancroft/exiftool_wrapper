@@ -68,7 +68,7 @@ namespace ExifToolUtils
             if (disposedValue) throw new ObjectDisposedException(GetType().FullName);
 
             // Not multi-threaded, since we can't mix exiftool commands and preserve
-            // the ordering of the exiftool child process outout streams
+            // the ordering of the exiftool child process output streams
             lock (_instanceLock)
             {
                 foreach (var arg in parameters)
@@ -76,15 +76,33 @@ namespace ExifToolUtils
                     _exiftoolproc.StandardInput.WriteLine(arg);
                 }
 
-                using (var stdOutDataReceived = new AutoResetEvent(false))
+                using (var execComplete = new AutoResetEvent(false))
                 {
                     var stdOutLines = new List<String>();
                     var stdErrLines = new List<String>();
 
+                    bool TryRemoveEndOfOutputMarker(string input, out string cleaned)
+                    {
+                        cleaned = input;
+                        var index = input.IndexOf(endOutputFlag);
+                        if (index!=-1)
+                        {
+                            cleaned = input.Substring(0, index);
+                        }
+                        return index!=-1;
+                    }
+
                     void StdOutAction(object sender, DataReceivedEventArgs args)
                     {
-                        stdOutLines.Add(args.Data);
-                        stdOutDataReceived.Set();
+                        var detectedMarker = TryRemoveEndOfOutputMarker(args.Data, out string clean);
+                        if (!String.IsNullOrEmpty(clean))
+                        {
+                            stdOutLines.Add(clean);
+                        }
+                        if (detectedMarker)
+                        {
+                            execComplete.Set();
+                        }
                     }
 
                     void StdErrAction(object sender, DataReceivedEventArgs args)
@@ -92,39 +110,15 @@ namespace ExifToolUtils
                         stdErrLines.Add(args.Data);
                     }
 
-                    void WaitForExecuteComplete()
-                    {
-                        while (stdOutLines.Count==0 || !stdOutLines.Last().Contains(endOutputFlag))
-                        {
-                            stdOutDataReceived.WaitOne();
-                        }
-                    }
-
-                    void RemoveEndOutputFlag()
-                    {
-                        var lastLine = stdOutLines.Last();
-                        var cleaned = lastLine.Replace(endOutputFlag, "");
-                        if (String.IsNullOrEmpty(cleaned))
-                        {
-                            stdOutLines.Remove(lastLine);
-                        }
-                        else
-                        {
-                            stdOutLines[stdOutLines.Count-1] = cleaned;
-                        }
-                    }
-
                     _exiftoolproc.OutputDataReceived += StdOutAction;
                     _exiftoolproc.ErrorDataReceived += StdErrAction;
 
                     _exiftoolproc.StandardInput.WriteLine("-execute");
 
-                    WaitForExecuteComplete();
+                    execComplete.WaitOne();
 
                     _exiftoolproc.OutputDataReceived -= StdOutAction;
                     _exiftoolproc.ErrorDataReceived -= StdErrAction;
-
-                    RemoveEndOutputFlag();
 
                     return new ExecuteResult(stdOutLines, stdErrLines);
                 }
