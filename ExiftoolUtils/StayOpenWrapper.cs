@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Linq;
 using System.Collections.ObjectModel;
+using System.Text;
 
 namespace ExifToolUtils
 {
@@ -12,21 +13,21 @@ namespace ExifToolUtils
     /// </summary>
     public sealed class ExecuteResult
     {
-        internal ExecuteResult(IList<string> stdOut, IList<string> stdErr)
+        internal ExecuteResult(string stdOut, string stdErr)
         {
-            StdOutLines = new ReadOnlyCollection<string>(stdOut);
-            StdErrLines = new ReadOnlyCollection<string>(stdErr);
+            StdOut = stdOut;
+            StdErr = stdErr;
         }
 
         /// <summary>
-        /// The lines captured from exiftool stdout stream
+        /// The text captured from exiftool stdout stream
         /// </summary>
-        public ReadOnlyCollection<string> StdOutLines { get; }
+        public string StdOut { get; }
 
         /// <summary>
-        /// The lines captured from exiftool stderr stream
+        /// The text captured from exiftool stderr stream
         /// </summary>
-        public ReadOnlyCollection<string> StdErrLines { get; }
+        public string StdErr { get; }
     }
 
     /// <summary>
@@ -78,26 +79,25 @@ namespace ExifToolUtils
 
                 using (var execComplete = new AutoResetEvent(false))
                 {
-                    var stdOutLines = new List<String>();
-                    var stdErrLines = new List<String>();
+                    var stdOutLines = new StringBuilder();
+                    var stdErrLines = new StringBuilder();
 
-                    bool TryRemoveEndOfOutputMarker(string input, out string cleaned)
+                    (bool foundMarker, string cleaned) TryRemoveEndOfOutputMarker(string input)
                     {
-                        cleaned = input;
                         var index = input.IndexOf(endOutputFlag);
-                        if (index!=-1)
+                        if (index==-1)
                         {
-                            cleaned = input.Substring(0, index);
+                            return (false, input);
                         }
-                        return index!=-1;
+                        return (true, input.Substring(0, index));
                     }
 
                     void StdOutAction(object sender, DataReceivedEventArgs args)
                     {
-                        var detectedMarker = TryRemoveEndOfOutputMarker(args.Data, out string clean);
+                        var (detectedMarker, clean) = TryRemoveEndOfOutputMarker(args.Data);
                         if (!String.IsNullOrEmpty(clean))
                         {
-                            stdOutLines.Add(clean);
+                            stdOutLines.Append(clean);
                         }
                         if (detectedMarker)
                         {
@@ -107,7 +107,7 @@ namespace ExifToolUtils
 
                     void StdErrAction(object sender, DataReceivedEventArgs args)
                     {
-                        stdErrLines.Add(args.Data);
+                        stdErrLines.Append(args.Data);
                     }
 
                     _exiftoolproc.OutputDataReceived += StdOutAction;
@@ -120,7 +120,7 @@ namespace ExifToolUtils
                     _exiftoolproc.OutputDataReceived -= StdOutAction;
                     _exiftoolproc.ErrorDataReceived -= StdErrAction;
 
-                    return new ExecuteResult(stdOutLines, stdErrLines);
+                    return new ExecuteResult(stdOutLines.ToString(), stdErrLines.ToString());
                 }
             }
         }
